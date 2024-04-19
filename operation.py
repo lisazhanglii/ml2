@@ -4,6 +4,11 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 from dagshub import DAGsHubLogger
 import hashlib
+import mlflow
+import dagshub
+
+dagshub.init(repo_owner='yixinzha', repo_name='assign2', mlflow=True)
+
 
 # Load the dataset
 file_path = 'vineyard_weather_1948-2017.csv'
@@ -47,27 +52,20 @@ y = cleaned_data['STORM_NEXT_WEEK'].astype(int)  # Target variable
 # Splitting data into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 def run_experiment(params, experiment_name):
-    # Initialize logger
-    logger = DAGsHubLogger()
+    with mlflow.start_run():
+        clf = RandomForestClassifier(**params, random_state=42)
+        clf.fit(X_train, y_train)
+        y_pred = clf.predict(X_test)
 
-    # Initialize classifier with the provided parameters
-    clf = RandomForestClassifier(**params)
-    clf.fit(X_train, y_train)
-    y_pred = clf.predict(X_test)
+        metrics = {
+            'accuracy': accuracy_score(y_test, y_pred),
+            'precision': precision_score(y_test, y_pred, zero_division=0),
+            'recall': recall_score(y_test, y_pred)
+        }
 
-    # Calculate metrics
-    metrics = {
-        'accuracy': accuracy_score(y_test, y_pred),
-        'precision': precision_score(y_test, y_pred, zero_division=0),
-        'recall': recall_score(y_test, y_pred)
-    }
-
-    # Log hyperparameters and metrics
-    logger.log_hyperparams({'experiment_name': experiment_name, **params})
-    logger.log_metrics(metrics)
-
-    # Make sure to close the logger to flush all the logged items
-    logger.close()
+        mlflow.log_params(params)
+        mlflow.log_metrics(metrics)
+        mlflow.set_tag('experiment_name', experiment_name)
 
     return metrics
 # Define different sets of parameters for each experiment
@@ -75,12 +73,10 @@ param_set_1 = {'n_estimators': 100, 'max_depth': 10}
 param_set_2 = {'n_estimators': 150, 'max_depth': 15}
 param_set_3 = {'n_estimators': 200, 'max_depth': 20}
 
-# Run experiments and log results to DagsHub
 metrics_1 = run_experiment(param_set_1, 'experiment_1')
 metrics_2 = run_experiment(param_set_2, 'experiment_2')
 metrics_3 = run_experiment(param_set_3, 'experiment_3')
 
-# Output the results
 print(f"Metrics for param set 1: {metrics_1}")
 print(f"Metrics for param set 2: {metrics_2}")
 print(f"Metrics for param set 3: {metrics_3}")
