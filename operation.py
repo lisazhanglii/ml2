@@ -52,7 +52,7 @@ y = cleaned_data['STORM_NEXT_WEEK'].astype(int)  # Target variable
 # Splitting data into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 def run_experiment(params, experiment_name):
-    with mlflow.start_run():
+    with mlflow.start_run(nested=True):  # Use nested=True to allow nested runs
         clf = RandomForestClassifier(**params, random_state=42)
         clf.fit(X_train, y_train)
         y_pred = clf.predict(X_test)
@@ -63,11 +63,13 @@ def run_experiment(params, experiment_name):
             'recall': recall_score(y_test, y_pred)
         }
 
+        # Log parameters and metrics
         mlflow.log_params(params)
         mlflow.log_metrics(metrics)
         mlflow.set_tag('experiment_name', experiment_name)
 
     return metrics
+
 # Define different sets of parameters for each experiment
 param_set_1 = {'n_estimators': 100, 'max_depth': 10}
 param_set_2 = {'n_estimators': 150, 'max_depth': 15}
